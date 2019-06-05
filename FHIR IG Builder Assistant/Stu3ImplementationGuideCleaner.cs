@@ -96,7 +96,7 @@ namespace FHIR_IG_Builder_Assistant
                         {
                             // Cleanup the canonical URI
                             // e.g. http://fhir.telstrahealth.com.au/th-ncsr/StructureDefinition/ncsr-patient
-                            string generateCanonical = $"http://fhir.telstrahealth.com.au/th-ncsr/{item.ResourceType}/{item.Id}";
+                            string generateCanonical = $"http://fhir.telstrahealth.com/th-ncsr/{item.ResourceType}/{item.Id}";
                             conf.Url = generateCanonical;
 
                             //canonicalToSP.Add(item.Url, item);
@@ -162,6 +162,53 @@ namespace FHIR_IG_Builder_Assistant
                     Console.WriteLine($"Added {key} to IG");
                     ig.Package.First().Resource.Add(new ImplementationGuide.ResourceComponent() { Example = false, Source = new ResourceReference(key) });
                 }
+                else
+                {
+                    // copy the name in
+                    var res = ig.Package.Select(p => p.Resource.First(r => (r.Source as ResourceReference).Reference == key)).First();
+                    if (resources.First(r => $"{r.TypeName}/{r.Id}" == key) is IConformanceResource conf)
+                    {
+                        res.Name = conf.Name;
+                    }
+                }
+            }
+
+            // Update the sequencing of the resources in the IG.xml (and alphabetical by name within each type)
+            foreach (var p in ig.Package)
+            {
+                var packResource = new List<ImplementationGuide.ResourceComponent>();
+
+                // Capability Statements
+                packResource.AddRange(FilterResourcesToType(p.Resource, "CapabilityStatement").OrderBy(o => o.Name));
+                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "CapabilityStatement"));
+
+                // Code Systems
+                packResource.AddRange(FilterResourcesToType(p.Resource, "CodeSystem").OrderBy(o => o.Name));
+                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "CodeSystem"));
+
+                // ValueSets
+                packResource.AddRange(FilterResourcesToType(p.Resource, "ValueSet").OrderBy(o => o.Name));
+                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "ValueSet"));
+
+                // Extension Definitions
+                packResource.AddRange(FilterStructureDefinitions(p.Resource, true, resources).OrderBy(o => o.Name));
+                RemoveRange(p.Resource, FilterStructureDefinitions(p.Resource, true, resources));
+
+                // Profile Definitions
+                packResource.AddRange(FilterStructureDefinitions(p.Resource, false, resources).OrderBy(o => o.Name));
+                RemoveRange(p.Resource, FilterStructureDefinitions(p.Resource, false, resources));
+
+                // Operation Definitions
+                packResource.AddRange(FilterResourcesToType(p.Resource, "OperationDefinition").OrderBy(o => o.Name));
+                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "OperationDefinition"));
+
+                // Search Parameters
+                packResource.AddRange(FilterResourcesToType(p.Resource, "SearchParameter").OrderBy(o => o.Name));
+                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "SearchParameter"));
+
+                // anything else
+                packResource.AddRange(p.Resource);
+                p.Resource = packResource;
             }
 
             string newIGContent = OutputResource(serializerXml, ig);
@@ -172,6 +219,30 @@ namespace FHIR_IG_Builder_Assistant
                 Console.WriteLine($"Updated ig.xml");
             }
 
+        }
+
+        private void RemoveRange(List<ImplementationGuide.ResourceComponent> resource, IEnumerable<ImplementationGuide.ResourceComponent> removeThese)
+        {
+            foreach (var item in removeThese.ToArray())
+            {
+                resource.Remove(item);
+            }
+        }
+
+        private static IEnumerable<ImplementationGuide.ResourceComponent> FilterStructureDefinitions(List<ImplementationGuide.ResourceComponent> list, bool extensions, List<Resource> resources)
+        {
+            var results = list.Where(r => r.Example == false && (r.Source as ResourceReference).Reference.StartsWith("StructureDefinition"));
+            
+            // now filter this list further checking if the referenced SD is an extension or not
+            var filteredExtensions = results.Where(r => resources.Any(item => (r.Source as ResourceReference).Reference == "StructureDefinition/" + item.Id && (item as StructureDefinition)?.Kind == StructureDefinition.StructureDefinitionKind.ComplexType));
+            if (extensions)
+                return filteredExtensions;
+            return results.Except(filteredExtensions);
+        }
+
+        private static IEnumerable<ImplementationGuide.ResourceComponent> FilterResourcesToType(List<ImplementationGuide.ResourceComponent> list, string resourceName)
+        {
+            return list.Where(r => r.Example == false && (r.Source as ResourceReference).Reference.StartsWith(resourceName));
         }
 
         private void CreateMarkdownStubIfMissing(string filename)
