@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FHIR IG Builder Assistant": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\git\\ncsr-hcp-ig"
+    }
+  }
+}
