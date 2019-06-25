@@ -95,7 +95,7 @@ namespace FHIR_IG_Builder_Assistant
                         Name = item.Code,
                         Definition = item.Url,
                         Type = item.Type,
-                        Documentation = item.Description.Value
+                        Documentation = item.Description
                     });
                 }
             }

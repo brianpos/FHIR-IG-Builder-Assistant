@@ -1,10 +1,14 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using Hl7.Fhir.Utility;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 
 namespace FHIR_IG_Builder_Assistant
@@ -44,6 +48,7 @@ namespace FHIR_IG_Builder_Assistant
 
             ImplementationGuide ig = null;
             List<Resource> resources = new List<Resource>();
+            Dictionary<string, Resource> fileResources = new Dictionary<string, Resource>();
 
             foreach (var file in testFilenames)
             {
@@ -85,6 +90,8 @@ namespace FHIR_IG_Builder_Assistant
                         else
                         {
                             resources.Add(item);
+                            if (item is IConformanceResource)
+                                fileResources.Add(file, item);
                         }
 
                         // --------------------------------------
@@ -96,8 +103,23 @@ namespace FHIR_IG_Builder_Assistant
                         {
                             // Cleanup the canonical URI
                             // e.g. http://fhir.telstrahealth.com.au/th-ncsr/StructureDefinition/ncsr-patient
-                            string generateCanonical = $"http://fhir.telstrahealth.com/th-ncsr/{item.ResourceType}/{item.Id}";
-                            conf.Url = generateCanonical;
+                            string generateCanonical = $"http://fhir.telstrahealth.com/th-epd/{item.ResourceType}/{item.Id}";
+                            if (!conf.Url.StartsWith("http://hl7.org.au"))
+                                conf.Url = generateCanonical;
+
+                            Regex r = new Regex("^[A-Z]([A-Za-z0-9_]){0,254}$", RegexOptions.Singleline);
+                            if (conf.Name == null || !r.IsMatch(conf.Name))
+                            {
+                                conf.Name = $"Epd_{item.Id.Replace("searchparameter-", "_sp_").Replace("-", "_")}";
+                                if (!r.IsMatch(conf.Name))
+                                {
+                                    System.Diagnostics.Trace.WriteLine($"Replaced Name property is still invalid {conf.Name}");
+                                }
+                            }
+                            if (conf.Publisher != "Telstra Health")
+                            {
+                                conf.Publisher = "Telstra Health";
+                            }
 
                             //canonicalToSP.Add(item.Url, item);
                             //canonicalToLocalSP.Add(item.Url, item);
@@ -105,11 +127,24 @@ namespace FHIR_IG_Builder_Assistant
 
                         if (item is StructureDefinition sd)
                         {
-                            // Cleanup StructureDefinition opening element that forge removes
+                            // remove the snapshot - that get's regenerated anyway
                             sd.Snapshot = null;
+
+                            // Cleanup StructureDefinition opening element that forge removes
                             if (sd.Type != sd.Differential.Element[0].Path)
                             {
                                 sd.Differential.Element.Insert(0, new ElementDefinition() { ElementId = sd.Type, Path = sd.Type });
+                            }
+
+                            // Check any extension URLs
+                            var elemExtensionUrl = sd.Differential.Element.FirstOrDefault(e => e.Path == "Extension.url")?.Fixed as FhirUri;
+                            if (elemExtensionUrl != null)
+                            {
+                                if (elemExtensionUrl.Value != conf.Url)
+                                {
+                                    Console.WriteLine($"Fixed Extension URL from {elemExtensionUrl.Value} to {conf.Url}");
+                                    elemExtensionUrl.Value = conf.Url;
+                                }
                             }
 
                             // Check for existence of the markdown files
@@ -126,6 +161,22 @@ namespace FHIR_IG_Builder_Assistant
                             CreateMarkdownStubIfMissing($"{PagesIncludesDirectory}/{item.Id}-intro.md");
                             CreateMarkdownStubIfMissing($"{PagesIncludesDirectory}/{item.Id}-summary.md");
                             CreateMarkdownStubIfMissing($"{PagesIncludesDirectory}/{item.Id}-search.md");
+                        }
+
+                        if (item is CodeSystem cs)
+                        {
+                            if (cs.Title == null)
+                                cs.Title = cs.Name;
+                            if (cs.Description == null)
+                                cs.Description = new Markdown(cs.Name);
+                        }
+
+                        if (item is ValueSet vs)
+                        {
+                            if (vs.Title == null)
+                                vs.Title = vs.Name;
+                            if (vs.Description == null)
+                                vs.Description = new Markdown(vs.Name);
                         }
 
                         string newContent;
@@ -156,16 +207,16 @@ namespace FHIR_IG_Builder_Assistant
             foreach (var item in resources)
             {
                 string key = $"{item.ResourceType}/{item.Id}";
-                if (!ig.Package.Any(p => p.Resource.Any(r => (r.Source as ResourceReference).Reference == key)))
+                if (!ig.Definition.Resource.Any(r => r.Reference.Reference == key))
                 {
                     // This resource needs to be included
                     Console.WriteLine($"Added {key} to IG");
-                    ig.Package.First().Resource.Add(new ImplementationGuide.ResourceComponent() { Example = false, Source = new ResourceReference(key) });
+                    ig.Definition.Resource.Add(new ImplementationGuide.ResourceComponent() { Example = null, Reference = new ResourceReference(key) });
                 }
                 else
                 {
                     // copy the name in
-                    var res = ig.Package.Select(p => p.Resource.First(r => (r.Source as ResourceReference).Reference == key)).First();
+                    var res = ig.Definition.Resource.First(r => r.Reference.Reference == key);
                     if (resources.First(r => $"{r.TypeName}/{r.Id}" == key) is IConformanceResource conf)
                     {
                         res.Name = conf.Name;
@@ -174,42 +225,53 @@ namespace FHIR_IG_Builder_Assistant
             }
 
             // Update the sequencing of the resources in the IG.xml (and alphabetical by name within each type)
-            foreach (var p in ig.Package)
-            {
-                var packResource = new List<ImplementationGuide.ResourceComponent>();
+            var packResource = new List<ImplementationGuide.ResourceComponent>();
+            var p = ig.Definition;
 
-                // Capability Statements
-                packResource.AddRange(FilterResourcesToType(p.Resource, "CapabilityStatement").OrderBy(o => o.Name));
-                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "CapabilityStatement"));
+            // Code Systems
+            packResource.AddRange(FilterResourcesToType(p.Resource, "CodeSystem").OrderBy(o => o.Name));
+            RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "CodeSystem"));
 
-                // Code Systems
-                packResource.AddRange(FilterResourcesToType(p.Resource, "CodeSystem").OrderBy(o => o.Name));
-                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "CodeSystem"));
+            // ValueSets
+            packResource.AddRange(FilterResourcesToType(p.Resource, "ValueSet").OrderBy(o => o.Name));
+            RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "ValueSet"));
 
-                // ValueSets
-                packResource.AddRange(FilterResourcesToType(p.Resource, "ValueSet").OrderBy(o => o.Name));
-                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "ValueSet"));
+            // Extension Definitions
+            packResource.AddRange(FilterStructureDefinitions(p.Resource, true, resources).OrderBy(o => o.Name));
+            RemoveRange(p.Resource, FilterStructureDefinitions(p.Resource, true, resources));
 
-                // Extension Definitions
-                packResource.AddRange(FilterStructureDefinitions(p.Resource, true, resources).OrderBy(o => o.Name));
-                RemoveRange(p.Resource, FilterStructureDefinitions(p.Resource, true, resources));
+            // Profile Definitions
+            packResource.AddRange(FilterStructureDefinitions(p.Resource, false, resources).OrderBy(o => o.Name));
+            RemoveRange(p.Resource, FilterStructureDefinitions(p.Resource, false, resources));
 
-                // Profile Definitions
-                packResource.AddRange(FilterStructureDefinitions(p.Resource, false, resources).OrderBy(o => o.Name));
-                RemoveRange(p.Resource, FilterStructureDefinitions(p.Resource, false, resources));
+            // Operation Definitions
+            packResource.AddRange(FilterResourcesToType(p.Resource, "OperationDefinition").OrderBy(o => o.Name));
+            RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "OperationDefinition"));
 
-                // Operation Definitions
-                packResource.AddRange(FilterResourcesToType(p.Resource, "OperationDefinition").OrderBy(o => o.Name));
-                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "OperationDefinition"));
+            // Search Parameters
+            packResource.AddRange(FilterResourcesToType(p.Resource, "SearchParameter").OrderBy(o => o.Name));
+            RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "SearchParameter"));
 
-                // Search Parameters
-                packResource.AddRange(FilterResourcesToType(p.Resource, "SearchParameter").OrderBy(o => o.Name));
-                RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "SearchParameter"));
+            // Capability Statements
+            packResource.AddRange(FilterResourcesToType(p.Resource, "CapabilityStatement").OrderBy(o => o.Name));
+            RemoveRange(p.Resource, FilterResourcesToType(p.Resource, "CapabilityStatement"));
 
-                // anything else
-                packResource.AddRange(p.Resource);
-                p.Resource = packResource;
-            }
+            // anything else
+            packResource.AddRange(p.Resource);
+            p.Resource = packResource;
+
+            // Now re-pack the manifest section
+            //if (ig.Manifest == null)
+            //    ig.Manifest = new ImplementationGuide.ManifestComponent();
+            //ig.Manifest.Resource.Clear();
+            //foreach (var pair in fileResources)
+            //{
+            //    ig.Manifest.Resource.Add(new ImplementationGuide.ManifestResourceComponent()
+            //    {
+            //        Reference = new ResourceReference($"{pair.Value.ResourceType.GetLiteral()}/{pair.Value.Id}"),
+            //        RelativePath = $"{pair.Value.ResourceType.GetLiteral()}-{pair.Value.Id}.html"
+            //    });
+            //}
 
             string newIGContent = OutputResource(serializerXml, ig);
 
@@ -219,6 +281,30 @@ namespace FHIR_IG_Builder_Assistant
                 Console.WriteLine($"Updated ig.xml");
             }
 
+            // And re-process the IG.json file to generate the resources section
+            string igJsonText = System.IO.File.ReadAllText(_directory + "/ig.json");
+            var js = new JsonSerializer();
+            js.Formatting = Newtonsoft.Json.Formatting.Indented;
+            var igJson = js.Deserialize(new JsonTextReader(new StringReader(igJsonText)));
+            Newtonsoft.Json.Linq.JToken t = igJson as Newtonsoft.Json.Linq.JToken;
+            var igJsonResources = t["resources"] as JContainer;
+            igJsonResources.RemoveAll();
+            foreach (var pair in fileResources)
+            {
+                FileInfo fi = new FileInfo(pair.Key);
+                string htmlName = $"{pair.Value.ResourceType.GetLiteral()}-{fi.Name.Substring(0, fi.Name.Length - fi.Extension.Length)}.html";
+                htmlName = htmlName.Replace(pair.Value.ResourceType.GetLiteral().ToLower(), "");
+                htmlName = htmlName.Replace("--", "-");
+                string content = $"{{\r\n  \"{pair.Value.ResourceType.GetLiteral()}/{pair.Value.Id}\": {{\r\n" +
+                    $"    \"source\" : \"{fi.Name}\",\r\n" +
+                    $"    \"base\" : \"{htmlName}\"\r\n" +
+                    $"  }}\r\n}}";
+                var newNode = Newtonsoft.Json.Linq.JObject.Parse(content) as JToken;
+                igJsonResources.Add(newNode.Children().First());
+            }
+            var sb = new StringBuilder();
+            js.Serialize(new JsonTextWriter(new StringWriter(sb)), igJson);
+            System.IO.File.WriteAllText(_directory + "/ig.json", sb.ToString());
         }
 
         private void RemoveRange(List<ImplementationGuide.ResourceComponent> resource, IEnumerable<ImplementationGuide.ResourceComponent> removeThese)
@@ -231,10 +317,10 @@ namespace FHIR_IG_Builder_Assistant
 
         private static IEnumerable<ImplementationGuide.ResourceComponent> FilterStructureDefinitions(List<ImplementationGuide.ResourceComponent> list, bool extensions, List<Resource> resources)
         {
-            var results = list.Where(r => r.Example == false && (r.Source as ResourceReference).Reference.StartsWith("StructureDefinition"));
+            var results = list.Where(r => r.Example != null && r.Reference.Reference.StartsWith("StructureDefinition"));
             
             // now filter this list further checking if the referenced SD is an extension or not
-            var filteredExtensions = results.Where(r => resources.Any(item => (r.Source as ResourceReference).Reference == "StructureDefinition/" + item.Id && (item as StructureDefinition)?.Kind == StructureDefinition.StructureDefinitionKind.ComplexType));
+            var filteredExtensions = results.Where(r => resources.Any(item => r.Reference.Reference == "StructureDefinition/" + item.Id && (item as StructureDefinition)?.Kind == StructureDefinition.StructureDefinitionKind.ComplexType));
             if (extensions)
                 return filteredExtensions;
             return results.Except(filteredExtensions);
@@ -242,7 +328,7 @@ namespace FHIR_IG_Builder_Assistant
 
         private static IEnumerable<ImplementationGuide.ResourceComponent> FilterResourcesToType(List<ImplementationGuide.ResourceComponent> list, string resourceName)
         {
-            return list.Where(r => r.Example == false && (r.Source as ResourceReference).Reference.StartsWith(resourceName));
+            return list.Where(r => r.Example != null && r.Reference.Reference.StartsWith(resourceName));
         }
 
         private void CreateMarkdownStubIfMissing(string filename)
@@ -260,7 +346,7 @@ namespace FHIR_IG_Builder_Assistant
             doc.LoadXml(newJson);
             var sr = new System.IO.StringWriter();
             var xw = new XmlTextWriter(sr);
-            xw.Formatting = Formatting.Indented;
+            xw.Formatting = System.Xml.Formatting.Indented;
             xw.IndentChar = '\t';
             xw.Indentation = 1;
             doc.WriteTo(xw);
