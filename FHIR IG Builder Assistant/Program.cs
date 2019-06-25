@@ -8,10 +8,13 @@ namespace FHIR_IG_Builder_Assistant
         {
             Console.WriteLine($"Processing the Implementation Guide in {Environment.CurrentDirectory}");
 
-            var igc = new Stu3ImplementationGuideCleaner(Environment.CurrentDirectory);
-            igc.CanonicalizeAllResources();
+            // var igc = new Stu3ImplementationGuideCleaner(Environment.CurrentDirectory);
+            // igc.CanonicalizeAllResources();
+            
             //var capStmt = new CapabilityStatementCleaner();
             //capStmt.UpdateVhDirConformanceStatementWithSearchParameters();
+
+            new StripDownOpenAPI(Environment.CurrentDirectory).MakeOpenApiDocumentNotExternal();
         }
     }
 }
