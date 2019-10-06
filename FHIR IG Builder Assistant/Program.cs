@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 
 namespace FHIR_IG_Builder_Assistant
 {
@@ -8,13 +9,23 @@ namespace FHIR_IG_Builder_Assistant
         {
             Console.WriteLine($"Processing the Implementation Guide in {Environment.CurrentDirectory}");
 
-            // var igc = new Stu3ImplementationGuideCleaner(Environment.CurrentDirectory);
-            // igc.CanonicalizeAllResources();
-            
+            if (args.ToList().Contains("-normalize"))
+            {
+                var igc = new Stu3ImplementationGuideCleaner(Environment.CurrentDirectory);
+                igc.CanonicalizeAllResources();
+                return;
+            }
+            if (args.ToList().Contains("-cleanopenapi"))
+            {
+                new StripDownOpenAPI(Environment.CurrentDirectory).MakeOpenApiDocumentNotExternal();
+                return;
+            }
+
             //var capStmt = new CapabilityStatementCleaner();
             //capStmt.UpdateVhDirConformanceStatementWithSearchParameters();
-
-            new StripDownOpenAPI(Environment.CurrentDirectory).MakeOpenApiDocumentNotExternal();
+            Console.WriteLine("Usage:");
+            Console.WriteLine(" dotnet FHIR IG Builder Assistant.dll -normalize");
+            Console.WriteLine(" dotnet FHIR IG Builder Assistant.dll -cleanopenapi");
         }
     }
 }

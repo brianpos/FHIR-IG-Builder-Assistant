@@ -40,11 +40,29 @@ namespace FHIR_IG_Builder_Assistant
 
         public void CanonicalizeAllResources()
         {
+            Console.WriteLine("Canonicalizing All resources");
             var parserJson = new FhirJsonParser();
             var parserXml = new FhirXmlParser();
             var serializerJson = new FhirJsonSerializer(new SerializerSettings() { Pretty = true });
             var serializerXml = new FhirXmlSerializer(new SerializerSettings() { Pretty = true });
             var testFilenames = Directory.EnumerateFiles(ResourcesDirectory, "*.*", SearchOption.AllDirectories);
+
+            // read the canonical URI for the guide
+            string igJsonText = System.IO.File.ReadAllText(_directory + "/ig.json");
+            var js = new JsonSerializer();
+            js.Formatting = Newtonsoft.Json.Formatting.Indented;
+            var igJson = js.Deserialize(new JsonTextReader(new StringReader(igJsonText)));
+            Newtonsoft.Json.Linq.JToken t = igJson as Newtonsoft.Json.Linq.JToken;
+            var igJsonCanonicalBase = t["canonicalBase"] as JValue;
+            string canonicalBase = igJsonCanonicalBase.Value.ToString();
+            if (string.IsNullOrEmpty(canonicalBase))
+            {
+                Console.Error.WriteLine("No canonical Base defined in the ig.json file");
+                return;
+            }
+            string namePrefix = canonicalBase.Substring(canonicalBase.LastIndexOf("/") + 4);
+            namePrefix = namePrefix.Substring(0, 1).ToUpper() + namePrefix.Substring(1);
+
 
             ImplementationGuide ig = null;
             List<Resource> resources = new List<Resource>();
@@ -102,15 +120,15 @@ namespace FHIR_IG_Builder_Assistant
                         if (conf != null)
                         {
                             // Cleanup the canonical URI
-                            // e.g. http://fhir.telstrahealth.com.au/th-ncsr/StructureDefinition/ncsr-patient
-                            string generateCanonical = $"http://fhir.telstrahealth.com/th-epd/{item.ResourceType}/{item.Id}";
-                            if (!conf.Url.StartsWith("http://hl7.org.au"))
+                            // e.g. http://fhir.telstrahealth.com.au/th-epd/StructureDefinition/epd-practitioner
+                            string generateCanonical = $"{canonicalBase}/{item.ResourceType}/{item.Id}";
+                            if (!conf.Url.StartsWith("http://hl7.org.au") && !(item is ImplementationGuide))
                                 conf.Url = generateCanonical;
 
                             Regex r = new Regex("^[A-Z]([A-Za-z0-9_]){0,254}$", RegexOptions.Singleline);
                             if (conf.Name == null || !r.IsMatch(conf.Name))
                             {
-                                conf.Name = $"Epd_{item.Id.Replace("searchparameter-", "_sp_").Replace("-", "_")}";
+                                conf.Name = $"{namePrefix}_{item.Id.Replace("searchparameter-", "_sp_").Replace("-", "_")}";
                                 if (!r.IsMatch(conf.Name))
                                 {
                                     System.Diagnostics.Trace.WriteLine($"Replaced Name property is still invalid {conf.Name}");
@@ -282,11 +300,6 @@ namespace FHIR_IG_Builder_Assistant
             }
 
             // And re-process the IG.json file to generate the resources section
-            string igJsonText = System.IO.File.ReadAllText(_directory + "/ig.json");
-            var js = new JsonSerializer();
-            js.Formatting = Newtonsoft.Json.Formatting.Indented;
-            var igJson = js.Deserialize(new JsonTextReader(new StringReader(igJsonText)));
-            Newtonsoft.Json.Linq.JToken t = igJson as Newtonsoft.Json.Linq.JToken;
             var igJsonResources = t["resources"] as JContainer;
             igJsonResources.RemoveAll();
             foreach (var pair in fileResources)
@@ -295,6 +308,7 @@ namespace FHIR_IG_Builder_Assistant
                 string htmlName = $"{pair.Value.ResourceType.GetLiteral()}-{fi.Name.Substring(0, fi.Name.Length - fi.Extension.Length)}.html";
                 htmlName = htmlName.Replace(pair.Value.ResourceType.GetLiteral().ToLower(), "");
                 htmlName = htmlName.Replace("--", "-");
+                htmlName = htmlName.Replace($"{pair.Value.ResourceType.GetLiteral()}-{pair.Value.ResourceType.GetLiteral()}-", $"{pair.Value.ResourceType.GetLiteral()}-");
                 string content = $"{{\r\n  \"{pair.Value.ResourceType.GetLiteral()}/{pair.Value.Id}\": {{\r\n" +
                     $"    \"source\" : \"{fi.Name}\",\r\n" +
                     $"    \"base\" : \"{htmlName}\"\r\n" +

@@ -18,6 +18,7 @@ namespace FHIR_IG_Builder_Assistant
         }
         public void MakeOpenApiDocumentNotExternal()
         {
+            Console.WriteLine("Cleaning the openAPI outputs");
             var files = System.IO.Directory.EnumerateFiles(_directory + "\\output", "*.openapi.json", SearchOption.AllDirectories).ToArray();
             foreach (string file in files)
             {
@@ -45,6 +46,10 @@ namespace FHIR_IG_Builder_Assistant
                         if (!convertedTypes.ContainsKey(value.Replace("https://hl7.org/fhir/STU3/fhir.schema.json", "")))
                         {
                             convertedTypes.Add(value.Replace("https://hl7.org/fhir/STU3/fhir.schema.json", ""), null);
+                        }
+                        if (!convertedTypes.ContainsKey(value.Replace("https://hl7.org/fhir/R4/fhir.schema.json", "")))
+                        {
+                            convertedTypes.Add(value.Replace("https://hl7.org/fhir/R4/fhir.schema.json", ""), null);
                         }
                         schema.Value = value.Substring(value.IndexOf("#"));
                     }
@@ -140,7 +145,7 @@ namespace FHIR_IG_Builder_Assistant
 
                 if (sb.ToString() != igJsonText)
                     System.IO.File.WriteAllText(file+".json", sb.ToString());
-                Console.WriteLine(sb.ToString());
+                // Console.WriteLine(sb.ToString());
             }
         }
     }
