@@ -60,7 +60,9 @@ namespace FHIR_IG_Builder_Assistant
                 Console.Error.WriteLine("No canonical Base defined in the ig.json file");
                 return;
             }
-            string namePrefix = canonicalBase.Substring(canonicalBase.LastIndexOf("/") + 4);
+            string namePrefix = canonicalBase.Substring(canonicalBase.LastIndexOf("/") + 1);
+            if (namePrefix.Contains("-"))
+                namePrefix = namePrefix.Substring(namePrefix.IndexOf("-") + 1);
             namePrefix = namePrefix.Substring(0, 1).ToUpper() + namePrefix.Substring(1);
 
 
