@@ -35,6 +35,8 @@ namespace FHIR_IG_Builder_Assistant
             var packageListJson = js.Deserialize(new JsonTextReader(new StringReader(packageListJsonText)));
             t = packageListJson as Newtonsoft.Json.Linq.JToken;
             var igVersionList = t["list"] as JArray;
+            string currentFolder = null;
+            string currentVersion = null;
             foreach (JObject igVersion in igVersionList)
             {
                 string version = igVersion.Value<JToken>("version").ToString();
@@ -44,11 +46,13 @@ namespace FHIR_IG_Builder_Assistant
                 {
                     // this is the folder we need to process as the current version
                     ProcessFolder($"{directory}/{version}", "This is the current published version in its permanent home. <a href=\"..\\history.html\">Directory of published versions</a>", true);
+                    currentFolder = $"{directory}/{version}";
+                    currentVersion = version;
 
                     if (Directory.Exists($"{directory}/root"))
                     {
                         // this is the folder we need to process as the current version
-                        ProcessFolder($"{directory}/root", "This is the current published version. <a href=\"history.html\">Directory of published versions</a>", true);
+                        ProcessFolder($"{directory}/root", "This is the current published version in its permanent home. <a href=\"..\\history.html\">Directory of published versions</a>", true);
                     }
                 }
                 if (Directory.Exists($"{directory}/{version}") && current != "True")
@@ -57,7 +61,10 @@ namespace FHIR_IG_Builder_Assistant
                     ProcessFolder($"{directory}/{version}", $"This version is superseded by <a href=\"..\\{igBusinessVersion}\\index.html\">{igBusinessVersion}</a>. <a href=\"..\\history.html\">Directory of published versions</a>", false);
                 }
             }
-            ProcessFolder($"{directory}/output", "", true);
+            if (!string.IsNullOrEmpty(currentFolder))
+                ProcessFolder($"{directory}/output", $"This is the continuous integration build, it is not an authorized publication, and may be broken or incomplete at times. Refer to the <a href=\"..\\history.html\">Directory of published versions</a> for stable versions, or <a href=\"{currentFolder}\\index.html\">{currentVersion}</a> for the current version", true);
+            else
+                ProcessFolder($"{directory}/output", "This is the continuous integration build, it is not an authorized publication, and may be broken or incomplete at times. Refer to the <a href=\"..\\history.html\">Directory of published versions</a> for stable versions", true);
         }
 
         public void ProcessFolder(string directory, string replaceText, bool? current)
