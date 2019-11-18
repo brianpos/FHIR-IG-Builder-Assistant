@@ -52,7 +52,7 @@ namespace FHIR_IG_Builder_Assistant
                     if (Directory.Exists($"{directory}/root"))
                     {
                         // this is the folder we need to process as the current version
-                        ProcessFolder($"{directory}/root", "This is the current published version in its permanent home. <a href=\"..\\history.html\">Directory of published versions</a>", true);
+                        ProcessFolder($"{directory}/root", $"This is the current published version {version}. <a href=\"history.html\">Directory of published versions</a>", true);
                     }
                 }
                 if (Directory.Exists($"{directory}/{version}") && current != "True")
