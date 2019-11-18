@@ -62,7 +62,7 @@ namespace FHIR_IG_Builder_Assistant
                 }
             }
             if (!string.IsNullOrEmpty(currentFolder))
-                ProcessFolder($"{directory}/output", $"This is the continuous integration build, it is not an authorized publication, and may be broken or incomplete at times. Refer to the <a href=\"..\\history.html\">Directory of published versions</a> for stable versions, or <a href=\"{currentFolder}\\index.html\">{currentVersion}</a> for the current version", true);
+                ProcessFolder($"{directory}/output", $"This is the continuous integration build, it is not an authorized publication, and may be broken or incomplete at times. Refer to the <a href=\"..\\history.html\">Directory of published versions</a> for stable versions, or <a href=\"..\\{currentVersion}\\index.html\">{currentVersion}</a> for the current version", true);
             else
                 ProcessFolder($"{directory}/output", "This is the continuous integration build, it is not an authorized publication, and may be broken or incomplete at times. Refer to the <a href=\"..\\history.html\">Directory of published versions</a> for stable versions", true);
         }
