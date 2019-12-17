@@ -75,7 +75,8 @@ namespace FHIR_IG_Builder_Assistant
                     continue;
                 Console.WriteLine(filename);
                 if (!UpdateHtml(filename, "<!--ReleaseHeader-->", "<!--EndReleaseHeader-->", replaceText, current))
-                    UpdateHtml(filename, "<!-- ReleaseHeader -->", "<!-- EndReleaseHeader -->", replaceText, current);
+                    if (!UpdateHtml(filename, "<!-- ReleaseHeader -->", "<!-- EndReleaseHeader -->", replaceText, current))
+                        Console.Error.WriteLine($"Publish Box template not in {filename}");
             }
         }
         private static string oldPublishBoxContent;
@@ -85,7 +86,6 @@ namespace FHIR_IG_Builder_Assistant
             int startPos = content.IndexOf(publishBoxStart);
             if (startPos == -1)
             {
-                Console.Error.WriteLine($"Publish Box template not in {filename}");
                 return false;
             }
             startPos += publishBoxStart.Length;
