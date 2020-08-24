@@ -58,7 +58,7 @@ namespace FHIR_IG_Builder_Assistant
                 if (Directory.Exists($"{directory}/{version}") && current != "True")
                 {
                     // this is the folder we need to process as the current version
-                    ProcessFolder($"{directory}/{version}", $"This version is superseded by <a href=\"..\\{igBusinessVersion}\\index.html\">{igBusinessVersion}</a>. <a href=\"..\\history.html\">Directory of published versions</a>", false);
+                    ProcessFolder($"{directory}/{version}", $"This version is superseded by <a href=\"..\\{currentVersion ?? igBusinessVersion}\\index.html\">{currentVersion ?? igBusinessVersion}</a>. <a href=\"..\\history.html\">Directory of published versions</a>", false);
                 }
             }
             if (!string.IsNullOrEmpty(currentFolder))
