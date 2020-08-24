@@ -66,7 +66,7 @@ namespace FHIR_IG_Builder_Assistant
             namePrefix = namePrefix.Substring(0, 1).ToUpper() + namePrefix.Substring(1);
 
 
-            ImplementationGuide ig = null;
+            ImplementationGuide ig = parserXml.Parse<ImplementationGuide>(File.ReadAllText(Path.Combine(ResourcesDirectory, "ig.xml")));
             List<Resource> resources = new List<Resource>();
             Dictionary<string, Resource> fileResources = new Dictionary<string, Resource>();
 
@@ -136,9 +136,9 @@ namespace FHIR_IG_Builder_Assistant
                                     System.Diagnostics.Trace.WriteLine($"Replaced Name property is still invalid {conf.Name}");
                                 }
                             }
-                            if (conf.Publisher != "Telstra Health")
+                            if (conf.Publisher != ig.Publisher)
                             {
-                                conf.Publisher = "Telstra Health";
+                                conf.Publisher = ig.Publisher;
                             }
 
                             //canonicalToSP.Add(item.Url, item);
