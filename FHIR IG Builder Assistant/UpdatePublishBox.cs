@@ -105,6 +105,32 @@ namespace FHIR_IG_Builder_Assistant
                     newContent += "</p>";
             }
             newContent += content.Substring(endPos);
+
+            if (filename.Contains("/output/") && newContent.Contains("<tr><td>ele-1</td>"))
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (string line in newContent.Split("\n"))
+                {
+                    // Default element nodes
+                    if (line.StartsWith("<tr><td>ele-1</td>"))
+                        continue;
+                    if (line.StartsWith("<tr><td>ext-1</td>"))
+                        continue;
+                    // DomainResource nodes
+                    if (line.StartsWith("<tr><td>dom-2</td>"))
+                        continue;
+                    if (line.StartsWith("<tr><td>dom-3</td>"))
+                        continue;
+                    if (line.StartsWith("<tr><td>dom-4</td>"))
+                        continue;
+                    if (line.StartsWith("<tr><td>dom-5</td>"))
+                        continue;
+                    if (line.StartsWith("<tr><td>dom-6</td>"))
+                        continue;
+                    sb.AppendLine(line);
+                }
+                newContent = sb.ToString();
+            }
             if (oldPublishBoxContent == null)
             {
                 oldPublishBoxContent = content.Substring(startPos, endPos - startPos);
@@ -122,7 +148,7 @@ namespace FHIR_IG_Builder_Assistant
                 //}
                 //else
                 //{
-                    System.IO.File.WriteAllText(filename, newContent);
+                System.IO.File.WriteAllText(filename, newContent);
                 //}
             }
             return true;
