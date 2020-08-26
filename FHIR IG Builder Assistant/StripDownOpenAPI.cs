@@ -19,7 +19,7 @@ namespace FHIR_IG_Builder_Assistant
         public void MakeOpenApiDocumentNotExternal()
         {
             Console.WriteLine("Cleaning the openAPI outputs");
-            var files = System.IO.Directory.EnumerateFiles(_directory + "\\output", "*.openapi.json", SearchOption.AllDirectories).ToArray();
+            var files = System.IO.Directory.EnumerateFiles(_directory + "/output", "*.openapi.json", SearchOption.AllDirectories).ToArray();
             foreach (string file in files)
             {
                 string igJsonText = System.IO.File.ReadAllText(file);

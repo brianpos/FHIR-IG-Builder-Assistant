@@ -2,7 +2,13 @@
   "profiles": {
     "FHIR IG Builder Assistant": {
       "commandName": "Project",
-      "workingDirectory": "C:\\git\\ehpd-ig"
+      "commandLineArgs": "-prepare-release",
+      "workingDirectory": "C:\\git\\MySL.FhirIG"
+    },
+    "Docker": {
+      "commandName": "Docker",
+      "commandLineArgs": "-prepare-release",
+      "workingDirectory": "/data"
     }
   }
 }

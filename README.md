@@ -1,28 +1,28 @@
-# FHIR-IG-Builder-Assistant
-Helper project that can tweak IG artifacts assisting in preparing IGs for publishing, and also simplifying OpenAPI artifacts to make work with editor.swagger.io
+# FHIR-IG-Assistant
+Helper project that can tweak IG artifacts assisting in preparing FHIR R4 IGs for publishing, and also simplifying OpenAPI artifacts to make work with editor.swagger.io
 
-## Usage:
+### Usage:
 
 ```
-dotnet FHIR IG Builder Assistant.dll -normalize
-dotnet FHIR IG Builder Assistant.dll -cleanopenapi
-dotnet FHIR IG Builder Assistant.dll -updatepublishbox "update with this text"
-dotnet FHIR IG Builder Assistant.dll -prepare-release
+dotnet FHIR_IG_Builder_Assistant.dll -normalize
+dotnet FHIR_IG_Builder_Assistant.dll -cleanopenapi
+dotnet FHIR_IG_Builder_Assistant.dll -updatepublishbox "update with this text"
+dotnet FHIR_IG_Builder_Assistant.dll -prepare-release
 ```
 
-## Normalize
+### Normalize
 This will scan over the IG folder, finding all resources, and ensuring that the appropriate markdown files exist in the `pages/
 _includes` folder, and are also included in the `IG.xml` and `ig.json` files, also updating any name values in the `ig.xml`
 
-## Clean OpenAPI
+### Clean OpenAPI
 This is an internal tool that was used to cleanse the output so that it could be used with 
 
-## Update Publish Box
+### Update Publish Box
 This will iterate over all files in the current working directory and replace the contents of the "publish box" with the textprovided
 
 The working folder of the application should be the output folder of the IG Publisher for this command
 
-## Prepare-Release
+### Prepare-Release
 The prepare release stage will perform several actions, iterating over all generated files in folders with the name of each version listed in the pacakge-list.json file in the folder, replacing the content with specific text.
 
 Before running this tool you should run a script that copies the output files into the appropriate folders
@@ -60,3 +60,24 @@ With this structure you can deploy your entire publishing repository by copying 
 The CI build in `output` can then be copied under a folder call `current`.
 
 Normal CI builds can then use the `Update Publish Box` command to just replace its content in output, and publish that folder to `current` as noted above.
+
+&nbsp;
+
+## 🔥🐳 Docker Usage
+
+#### Running an IG build using the image
+```shell
+docker run --rm --name fhir-ig-assistant -v "c:\git\MySL.FhirIG:/data:rw" -t brianpos/fhir-ig-assistant:latest -prepare-release
+```
+> ** Note: ** The `data` mounted path is the content for the build
+
+#### Building the docker image
+```shell
+$ docker build -t brianpos/fhir-ig-assistant:latest .
+```
+Need to add in `--no-cache` so that
+
+#### Publishing the docker image
+```shell
+$ docker push brianpos/fhir-ig-assistant:latest
+```

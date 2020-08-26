@@ -71,7 +71,7 @@ namespace FHIR_IG_Builder_Assistant
         {
             foreach (var filename in System.IO.Directory.EnumerateFiles(directory, "*.html", System.IO.SearchOption.AllDirectories))
             {
-                if (filename.Contains("\\qa"))
+                if (filename.Contains("\\qa") || filename.Contains("/qa"))
                     continue;
                 Console.WriteLine(filename);
                 if (!UpdateHtml(filename, "<!--ReleaseHeader-->", "<!--EndReleaseHeader-->", replaceText, current))
