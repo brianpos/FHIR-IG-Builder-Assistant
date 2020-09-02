@@ -103,7 +103,7 @@ namespace FHIR_IG_Builder_Assistant
                             continue;
                         }
 
-                        if (file.EndsWith(@"\ig.xml") && item is ImplementationGuide)
+                        if ((file.EndsWith(@"\ig.xml") || file.EndsWith(@"/ig.xml")) && item is ImplementationGuide)
                         {
                             ig = item as ImplementationGuide;
                         }
